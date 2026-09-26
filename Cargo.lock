@@ -4159,6 +4159,7 @@ dependencies = [
  "hex",
  "image",
  "jcode-app-core",
+ "jcode-base",
  "jcode-build-meta",
  "jcode-config-types",
  "jcode-core",
