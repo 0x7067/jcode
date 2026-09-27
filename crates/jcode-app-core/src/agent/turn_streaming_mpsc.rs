@@ -147,6 +147,7 @@ impl Agent {
             if let Some(event) = compaction_event {
                 // Reset cache tracker and tool lock on compaction since the message history changes
                 self.cache_tracker.reset();
+                self.kv_cache_monitor.reset();
                 self.locked_tools = None;
                 logging::info(&format!(
                     "Context compacted ({}{})",
@@ -268,12 +269,14 @@ impl Agent {
             let model_at_request_start = provider.model().to_string();
             let resume_session_id = self.provider_session_id.clone();
             self.last_status_detail = None;
-            let _ = event_tx.send(kv_cache_request_event(
+            let kv_request = kv_cache_request_event(
                 &cache_signature_messages,
                 &tools,
                 &split_prompt.static_part,
                 &ephemeral_signature_messages,
-            ));
+            );
+            self.begin_kv_cache_monitor_request(&kv_request, &model_at_request_start);
+            let _ = event_tx.send(kv_request);
             // These vectors are only needed to build the cache telemetry event.
             // Explicitly release their deeply cloned transcript strings before
             // waiting for the provider stream.
@@ -1108,6 +1111,13 @@ impl Agent {
                     cache_read_input: usage_cache_read,
                     cache_creation_input: usage_cache_creation,
                 });
+                if let Some(miss) = self.finish_kv_cache_monitor_request(
+                    usage_input.unwrap_or(0),
+                    usage_cache_read,
+                    usage_cache_creation,
+                ) {
+                    let _ = event_tx.send(miss);
+                }
             }
 
             // Store usage for debug queries

@@ -99,6 +99,7 @@ impl Agent {
             if let Some(event) = compaction_event {
                 // Reset cache tracker and tool lock on compaction since the message history changes
                 self.cache_tracker.reset();
+                self.kv_cache_monitor.reset();
                 self.locked_tools = None;
                 if print_output {
                     let tokens_str = event

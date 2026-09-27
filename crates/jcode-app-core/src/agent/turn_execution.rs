@@ -278,6 +278,7 @@ impl Agent {
         self.provider_session_id = None;
         self.session.provider_session_id = None;
         self.cache_tracker.reset();
+        self.kv_cache_monitor.reset();
         self.locked_tools = None;
         self.reset_tool_output_tracking();
         self.persist_session_best_effort("conversation rewind");
@@ -296,6 +297,7 @@ impl Agent {
         self.session.provider_session_id = snapshot.session_provider_session_id;
         self.session.updated_at = chrono::Utc::now();
         self.cache_tracker.reset();
+        self.kv_cache_monitor.reset();
         self.locked_tools = None;
         self.reset_tool_output_tracking();
         self.persist_session_best_effort("conversation rewind undo");
@@ -309,6 +311,7 @@ impl Agent {
             logging::info("Tool list unlocked — next request will pick up current tools");
             self.locked_tools = None;
             self.cache_tracker.reset();
+            self.kv_cache_monitor.reset();
         }
         // Allow the late-MCP-registration recheck to fire once for the next
         // snapshot (e.g. after an explicit `mcp` reload).
@@ -444,6 +447,7 @@ impl Agent {
         {
             *previous = fresh;
             self.cache_tracker.reset();
+            self.kv_cache_monitor.reset();
         }
 
         // Provider-native deferred MCP loading: MCP definitions live outside
@@ -462,6 +466,7 @@ impl Agent {
             self.locked_tools = None;
             self.mcp_late_register_resolved = false;
             self.cache_tracker.reset();
+            self.kv_cache_monitor.reset();
         }
         if native {
             return self.native_deferred_tool_definitions().await;
@@ -521,6 +526,7 @@ impl Agent {
                 self.mcp_late_register_resolved = true;
                 self.locked_tools = None;
                 self.cache_tracker.reset();
+                self.kv_cache_monitor.reset();
             } else {
                 // No MCP tools have appeared. They may still be connecting, so
                 // leave the guard unset and re-check on the next turn. Once they
@@ -726,8 +732,7 @@ impl Agent {
     /// each tool's input schema, is how the model learns about servers that
     /// finished connecting mid-session. Each tool is announced once.
     pub(crate) async fn announce_late_mcp_tools(&mut self) {
-        if self.mcp_tools_mode == crate::config::McpToolsMode::Eager || self.native_deferred_mcp()
-        {
+        if self.mcp_tools_mode == crate::config::McpToolsMode::Eager || self.native_deferred_mcp() {
             return;
         }
         self.seed_announced_mcp_tools_from_transcript();
@@ -782,7 +787,9 @@ impl Agent {
     /// their schemas) and tools named in earlier announcements (which matters
     /// after a session restore, when the in-memory set starts empty).
     fn seed_announced_mcp_tools_from_transcript(&mut self) {
-        let start = self.announced_mcp_scan_index.min(self.session.messages.len());
+        let start = self
+            .announced_mcp_scan_index
+            .min(self.session.messages.len());
         for message in &self.session.messages[start..] {
             for block in &message.content {
                 match block {
@@ -829,6 +836,7 @@ impl Agent {
         self.mcp_late_register_resolved = false;
         self.locked_tools = None;
         self.cache_tracker.reset();
+        self.kv_cache_monitor.reset();
     }
 
     pub async fn tool_names(&self) -> Vec<String> {
