@@ -1380,9 +1380,20 @@ pub(crate) fn format_countdown_until(target: chrono::DateTime<chrono::Utc>) -> S
 
 #[cfg_attr(test, allow(dead_code))]
 pub(crate) fn gather_git_info_inner() -> Option<GitInfo> {
-    use std::process::Command;
+    gather_git_info_in(None)
+}
 
-    let in_repo = Command::new("git")
+/// Git status for `dir` (or the process working directory when `None`).
+pub(crate) fn gather_git_info_in(dir: Option<&std::path::Path>) -> Option<GitInfo> {
+    let git = || {
+        let mut cmd = std::process::Command::new("git");
+        if let Some(dir) = dir {
+            cmd.current_dir(dir);
+        }
+        cmd
+    };
+
+    let in_repo = git()
         .args(["rev-parse", "--is-inside-work-tree"])
         .output()
         .ok()
@@ -1393,7 +1404,7 @@ pub(crate) fn gather_git_info_inner() -> Option<GitInfo> {
         return None;
     }
 
-    let branch = Command::new("git")
+    let branch = git()
         .args(["branch", "--show-current"])
         .output()
         .ok()
@@ -1412,14 +1423,14 @@ pub(crate) fn gather_git_info_inner() -> Option<GitInfo> {
     let mut untracked = 0;
     let mut all_files: Vec<crate::tui::info_widget::DirtyFile> = Vec::new();
 
-    let repo_root = Command::new("git")
+    let repo_root = git()
         .args(["rev-parse", "--show-toplevel"])
         .output()
         .ok()
         .filter(|o| o.status.success())
         .map(|o| std::path::PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()));
 
-    if let Ok(output) = Command::new("git")
+    if let Ok(output) = git()
         .args(["status", "--porcelain", "--untracked-files=all"])
         .output()
         && output.status.success()
@@ -1453,7 +1464,7 @@ pub(crate) fn gather_git_info_inner() -> Option<GitInfo> {
 
     // Line counts: tracked files from one numstat against HEAD (staged plus
     // unstaged), untracked files by counting their lines.
-    let numstat = Command::new("git")
+    let numstat = git()
         .args(["diff", "--numstat", "HEAD"])
         .output()
         .ok()
@@ -1486,7 +1497,7 @@ pub(crate) fn gather_git_info_inner() -> Option<GitInfo> {
     all_files.truncate(10);
     let dirty_files = all_files;
 
-    let (ahead, behind) = Command::new("git")
+    let (ahead, behind) = git()
         .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
         .output()
         .ok()
