@@ -1,0 +1,24 @@
+ios/Sources/JCodeKit/Connection.swift
+  h_29be57c0addd47 67,136,138-144,153-160,207,264-267
+ios/Sources/JCodeKit/SessionReducer.swift
+  h_29be57c0addd47 224-231,444,474-475,479-495
+ios/Sources/JCodeMobile/AppModel.swift
+  h_29be57c0addd47 39-48,154-157,173-176,184-188
+ios/Sources/JCodeMobile/JCodeMobileApp.swift
+  h_29be57c0addd47 19
+ios/Tests/JCodeKitTests/ConnectionTests.swift
+  h_29be57c0addd47 146,269,271,277-280
+ios/Tests/JCodeKitTests/SessionReducerTests.swift
+  h_29be57c0addd47 418,432-463
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f28e55a991e626b6f52681a302e5daae7d711dd3",
+  "prompts": {},
+  "humans": {
+    "h_29be57c0addd47": {
+      "author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
