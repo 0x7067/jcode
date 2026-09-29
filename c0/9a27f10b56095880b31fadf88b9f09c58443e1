@@ -1,0 +1,21 @@
+ios/Sources/JCodeMobile/Info.plist
+  s_e3dca644ef477f::t_47f3519d479cf0 49-58
+ios/Sources/JCodeMobile/Views/PairingView.swift
+  s_e3dca644ef477f::t_d614f5e1fcd0a1 191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c09a27f10b56095880b31fadf88b9f09c58443e1",
+  "prompts": {},
+  "sessions": {
+    "s_e3dca644ef477f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ed90-5895-7f71-8410-3479ea2ec053",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
