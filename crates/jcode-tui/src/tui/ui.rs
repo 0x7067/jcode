@@ -2827,13 +2827,9 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     };
     let diagram_focus = app.diagram_focus();
     let (diagram_scroll_x, diagram_scroll_y) = app.diagram_scroll();
-    let diagram_fullscreen = pinned_diagram.is_some() && app.diagram_pane_fullscreen();
-    let transcript_replaced = side_panel_fullscreen || diagram_fullscreen;
 
     // Compute layout depending on pane position (Side = right column, Top = above chat).
-    let (chat_area, diagram_area) = if diagram_fullscreen {
-        (area, None)
-    } else if let Some(diagram) = pinned_diagram.as_ref() {
+    let (chat_area, diagram_area) = if let Some(diagram) = pinned_diagram.as_ref() {
         match pane_position {
             crate::config::DiagramPanePosition::Side => {
                 const MIN_DIAGRAM_WIDTH: u16 = 24;
@@ -3178,7 +3174,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Use packed layout when content fits, scrolling layout otherwise
     let use_packed = terminal_clear_collapsed
         || (!swarm_page_active
-            && !transcript_replaced
+            && !side_panel_fullscreen
             && content_height + fixed_height <= available_height);
 
     // Layout: messages (includes header), queued, status, notification, inline UI, gap, input, donut
@@ -3299,11 +3295,6 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     } else {
         diff_pane_area
     };
-    let diagram_area = if diagram_fullscreen {
-        Some(messages_area)
-    } else {
-        diagram_area
-    };
     let _ = swarm_strip_height;
     note_chat_layout(ChatLayoutMetrics {
         chat_area,
@@ -3349,8 +3340,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             centered: false,
             ..Default::default()
         }
-    } else if terminal_clear_collapsed || transcript_replaced {
-        if transcript_replaced {
+    } else if terminal_clear_collapsed || side_panel_fullscreen {
+        if side_panel_fullscreen {
             clear_area(frame, messages_area);
         }
         // Collapsed terminal-style clear: the messages chunk is zero-height, so
@@ -3486,7 +3477,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         && !widget_data.is_empty()
         && !show_donut
         && !swarm_page_active
-        && !transcript_replaced
+        && !side_panel_fullscreen
     {
         if let Some(ref mut capture) = debug_capture {
             capture.render_order.push("render_info_widgets".to_string());
