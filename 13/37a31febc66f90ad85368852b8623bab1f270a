@@ -1,0 +1,16 @@
+ios/Sources/JCodeKit/SessionReducer.swift
+  h_29be57c0addd47 437-455,457,459-460,463,467-497
+ios/Tests/JCodeKitTests/SessionReducerTests.swift
+  h_29be57c0addd47 267-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1337a31febc66f90ad85368852b8623bab1f270a",
+  "prompts": {},
+  "humans": {
+    "h_29be57c0addd47": {
+      "author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
