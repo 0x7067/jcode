@@ -28,27 +28,8 @@ public actor URLSessionWebSocketTransport: WebSocketTransport {
         let task = URLSession.shared.webSocketTask(with: request)
         task.resume()
         self.task = task
-        // Force the handshake to complete (and surface auth failures) by
-        // sending a WebSocket-level ping before declaring success.
-        do {
-            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-                task.sendPing { error in
-                    if let error {
-                        cont.resume(throwing: error)
-                    } else {
-                        cont.resume()
-                    }
-                }
-            }
-        } catch {
-            // The gateway rejects unknown/revoked tokens at the upgrade with
-            // 401. Surface that distinctly so the connection loop can stop
-            // retrying and prompt a re-pair instead of backing off forever.
-            if let http = task.response as? HTTPURLResponse, http.statusCode == 401 {
-                throw TransportError.unauthorized
-            }
-            throw error
-        }
+        // The first protocol request completes the WebSocket handshake. A preflight
+        // ping can hang indefinitely on private-tailnet ws:// connections on iOS.
     }
 
     public func send(text: String) async throws {
