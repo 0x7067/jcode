@@ -1,0 +1,20 @@
+ios/Sources/JCodeMobile/Views/RootView.swift
+  h_29be57c0addd47 37
+ios/Sources/JCodeMobile/Views/PairingView.swift
+  h_29be57c0addd47 191
+ios/Sources/JCodeKit/Pairing.swift
+  h_29be57c0addd47 78-87
+ios/Tests/JCodeKitTests/WireTests.swift
+  h_29be57c0addd47 8-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c595917899a1eba5c655439433f7566269a2d371",
+  "prompts": {},
+  "humans": {
+    "h_29be57c0addd47": {
+      "author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
