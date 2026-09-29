@@ -1,0 +1,19 @@
+ios/Tests/JCodeKitTests/ConnectionTests.swift
+  s_f13d82b8901ef7::t_b6bb4d13c9e8a5 13,38,126-140,433,435-444,457
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "25889b14afc97f81f56d736f9a85753772c4332a",
+  "prompts": {},
+  "sessions": {
+    "s_f13d82b8901ef7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ee70-f86b-7531-96ce-0de148046040",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
