@@ -1,0 +1,14 @@
+ios/Sources/JCodeMobile/Views/ChatView.swift
+  h_29be57c0addd47 8,12,19,24,69-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "28f4970b65a2a4a166ecafa41f01c7f06129f246",
+  "prompts": {},
+  "humans": {
+    "h_29be57c0addd47": {
+      "author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
