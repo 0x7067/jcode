@@ -433,37 +433,65 @@ public enum SessionReducer {
 
         // History replaces the transcript wholesale: it is the server's
         // authoritative view, used on connect and reconnect.
-        state.transcript = payload.messages.compactMap { message in
-            let role: TranscriptEntry.Role
-            switch message.role {
-            case "user": role = .user
-            case "assistant": role = .assistant
-            case "system": role = .system
-            default: return nil
-            }
-            var toolCalls: [TranscriptEntry.ToolCall] = []
-            if let data = message.toolData {
-                toolCalls.append(
-                    .init(
-                        id: data.id,
-                        name: data.name,
-                        input: data.input,
-                        output: data.output ?? "",
-                        status: data.error.map { .failed($0) }
-                            ?? (data.output != nil ? .succeeded : .running)
-                    ))
-            } else {
-                toolCalls = message.toolCalls.map { name in
-                    .init(id: name, name: name, status: .succeeded)
+        var entries: [TranscriptEntry] = []
+        for message in payload.messages {
+            if message.role == "tool" {
+                guard let data = message.toolData else { continue }
+                let call = TranscriptEntry.ToolCall(
+                    id: data.id,
+                    name: data.name,
+                    input: data.input,
+                    output: data.output ?? message.content,
+                    status: data.error.map { .failed($0) } ?? .succeeded
+                )
+                if let last = entries.indices.last, entries[last].role == .assistant {
+                    if let index = entries[last].toolCalls.firstIndex(where: { $0.id == call.id }) {
+                        entries[last].toolCalls[index] = call
+                    } else {
+                        entries[last].toolCalls.append(call)
+                    }
+                } else {
+                    entries.append(TranscriptEntry(role: .assistant, text: "", toolCalls: [call]))
                 }
+                continue
             }
-            // Skip empty assistant placeholders.
-            if message.content.isEmpty && toolCalls.isEmpty {
-                return nil
+            if let entry = historyEntry(message) {
+                entries.append(entry)
             }
-            return TranscriptEntry(role: role, text: message.content, toolCalls: toolCalls)
         }
+        state.transcript = entries
         return state
+    }
+
+    private static func historyEntry(_ message: HistoryMessage) -> TranscriptEntry? {
+        let role: TranscriptEntry.Role
+        switch message.role {
+        case "user": role = .user
+        case "assistant": role = .assistant
+        case "system": role = .system
+        default: return nil
+        }
+        var toolCalls: [TranscriptEntry.ToolCall] = []
+        if let data = message.toolData {
+            toolCalls.append(
+                .init(
+                    id: data.id,
+                    name: data.name,
+                    input: data.input,
+                    output: data.output ?? "",
+                    status: data.error.map { .failed($0) }
+                        ?? (data.output != nil ? .succeeded : .running)
+                ))
+        } else {
+            toolCalls = message.toolCalls.map { name in
+                .init(id: name, name: name, status: .succeeded)
+            }
+        }
+        // Skip empty assistant placeholders.
+        if message.content.isEmpty && toolCalls.isEmpty {
+            return nil
+        }
+        return TranscriptEntry(role: role, text: message.content, toolCalls: toolCalls)
     }
 
     // MARK: - Helpers
