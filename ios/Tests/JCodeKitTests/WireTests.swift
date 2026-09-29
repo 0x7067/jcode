@@ -96,6 +96,34 @@ private func encodedObject(_ request: Request) throws -> [String: Any] {
     #expect(!credential.forgettingWorkspace("/w19").workspaces.contains("/w19"))
 }
 
+@Test func rePairingKeepsWorkspacesOfTheSameServer() throws {
+    let saved = try #require(
+        ServerCredential(host: "h", port: 1, token: "old", serverName: "s", serverVersion: "v")
+            .selectingWorkspace("/repo"))
+    let other = ServerCredential(host: "x", port: 1, token: "t", serverName: "s", serverVersion: "v")
+    let fresh = ServerCredential(host: "h", port: 1, token: "new", serverName: "s", serverVersion: "v2")
+
+    let merged = fresh.keepingWorkspaces(from: [other, saved])
+    #expect(merged.token == "new")
+    #expect(merged.serverVersion == "v2")
+    #expect(merged.workspaces == ["/repo"])
+
+    let unrelated = ServerCredential(host: "y", port: 2, token: "t", serverName: "s", serverVersion: "v")
+    #expect(unrelated.keepingWorkspaces(from: [saved]).workspaces.isEmpty)
+}
+
+@Test func rapidWorkspacePicksFallBackToLastConfirmed() throws {
+    let confirmed = try #require(
+        ServerCredential(host: "h", port: 1, token: "t", serverName: "s", serverVersion: "v")
+            .selectingWorkspace("/confirmed"))
+    let pickedA = try #require(confirmed.selectingWorkspace("/a"))
+
+    let afterA = ServerCredential.workspaceFallback(pending: nil, current: confirmed)
+    let afterB = ServerCredential.workspaceFallback(pending: afterA, current: pickedA)
+    #expect(afterA.activeWorkspace == "/confirmed")
+    #expect(afterB.activeWorkspace == "/confirmed")
+}
+
 @Test func decodesCredentialsSavedBeforeWorkspaces() throws {
     let legacy = try JSONEncoder().encode(
         ServerCredential(

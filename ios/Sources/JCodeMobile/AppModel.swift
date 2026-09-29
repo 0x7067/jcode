@@ -59,9 +59,8 @@ final class AppModel {
             port: gateway.port,
             token: response.token,
             serverName: response.serverName,
-            serverVersion: response.serverVersion,
-            workspaces: servers.first { $0.id == "\(gateway.host):\(gateway.port)" }?.workspaces ?? []
-        )
+            serverVersion: response.serverVersion
+        ).keepingWorkspaces(from: servers)
         store.save(credential)
         servers = store.loadAll()
         activeServer = credential
@@ -103,7 +102,8 @@ final class AppModel {
         guard let activeServer, let updated = activeServer.selectingWorkspace(path) else {
             return false
         }
-        let fallback = unconfirmedWorkspaceFallback ?? activeServer
+        let fallback = ServerCredential.workspaceFallback(
+            pending: unconfirmedWorkspaceFallback, current: activeServer)
         connect(to: updated)
         unconfirmedWorkspaceFallback = fallback
         return true

@@ -71,6 +71,21 @@ public struct ServerCredential: Codable, Equatable, Sendable, Identifiable {
         copy.workspaces.removeAll { $0 == path }
         return copy
     }
+
+    public func keepingWorkspaces(from saved: [ServerCredential]) -> ServerCredential {
+        guard workspaces.isEmpty, let previous = saved.first(where: { $0.id == id }) else {
+            return self
+        }
+        var copy = self
+        copy.workspaces = previous.workspaces
+        return copy
+    }
+
+    public static func workspaceFallback(
+        pending: ServerCredential?, current: ServerCredential
+    ) -> ServerCredential {
+        pending ?? current
+    }
 }
 
 public enum Workspace {
