@@ -137,9 +137,9 @@ public actor Connection {
                     authToken: configuration.authToken
                 )
                 self.transport = transport
+                try await subscribeAndSync()
                 yield(.phase(.connected))
                 attempt = 0
-                try await subscribeAndSync()
                 try await receiveLoop(transport: transport)
                 // Clean close: fall through to reconnect.
             } catch {

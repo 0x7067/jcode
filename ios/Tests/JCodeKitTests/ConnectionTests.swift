@@ -10,6 +10,7 @@ actor FakeTransport: WebSocketTransport {
         case failConnect
         case unauthorized
         case unauthorizedOnSend
+        case unreachableOnSend
     }
 
     let behavior: Behavior
@@ -34,6 +35,7 @@ actor FakeTransport: WebSocketTransport {
     func send(text: String) async throws {
         if closed { throw TransportError.notConnected }
         if behavior == .unauthorizedOnSend { throw TransportError.unauthorized }
+        if behavior == .unreachableOnSend { throw URLError(.cannotConnectToHost) }
         sentLines.append(text)
     }
 
@@ -118,6 +120,21 @@ private func waitForSentLines(_ transport: FakeTransport, count: Int) async thro
         return
     }
     #expect(reason.contains("Re-pair"))
+    await connection.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) func unreachableServerNeverReportsConnected() async throws {
+    let transport = FakeTransport(behavior: .unreachableOnSend)
+    let connection = makeConnection(transport: transport, maxReconnectAttempts: 2)
+    let stream = await connection.start(workingDirectory: "/repo")
+    var phases: [ConnectionPhase] = []
+    for await output in stream {
+        guard case .phase(let phase) = output else { continue }
+        phases.append(phase)
+        if case .failed = phase { break }
+    }
+    #expect(!phases.contains(.connected))
+    #expect(phases.contains(.reconnecting(attempt: 1)))
     await connection.stop()
 }
 
@@ -413,9 +430,18 @@ final class TransportQueue: @unchecked Sendable {
     await connection.stop()
 }
 
-@Test func reloadingTriggersFastReconnect() async throws {
+@Test(.timeLimit(.minutes(1))) func reloadingTriggersFastReconnect() async throws {
     let transport = FakeTransport()
-    let connection = makeConnection(transport: transport)
+    let transports = TransportQueue([transport, FakeTransport()])
+    let connection = Connection(
+        configuration: .init(
+            gateway: Gateway(host: "test.local"),
+            authToken: "tok",
+            maxReconnectAttempts: 1,
+            baseBackoffSeconds: 0.01
+        ),
+        makeTransport: { transports.next() }
+    )
     let stream = await connection.start()
 
     var iterator = stream.makeAsyncIterator()
@@ -428,7 +454,6 @@ final class TransportQueue: @unchecked Sendable {
     // Simulate the server dropping the socket for the restart.
     await transport.close()
 
-    // The connection reconnects (the shared FakeTransport accepts again).
     var phases: [ConnectionPhase] = []
     while let output = await iterator.next() {
         if case let .phase(phase) = output {
