@@ -1070,3 +1070,39 @@ fn mcp_state_request_decodes_and_reports_bridge_tools_ready() {
         .map(|f| std::str::from_utf8(f.data).unwrap().to_string());
     assert!(tool_name.unwrap().contains("list_pages"));
 }
+
+/// Cursor may precheck tool allowlisting before dispatching (exec fields
+/// 41/42/43). An unanswered precheck stalls the turn the same way an
+/// unanswered mcp_state did, so each must decode and get a reply.
+#[test]
+fn allowlist_prechecks_decode_and_reply_on_matching_field() {
+    let mut mcp = wire::field_str(1, wire::JCODE_TOOL_PROVIDER);
+    mcp.extend(wire::field_str(2, "cc_list_pages"));
+    let mut exec = wire::field_varint(1, 9);
+    exec.extend(wire::field_ld(42, &mcp));
+    match wire::decode_exec_server_message(&exec).unwrap().variant {
+        wire::ExecServerMessageVariant::McpAllowlistPrecheck {
+            provider_identifier,
+        } => {
+            assert_eq!(provider_identifier, wire::JCODE_TOOL_PROVIDER)
+        }
+        other => panic!("expected McpAllowlistPrecheck, got {other:?}"),
+    }
+    for field in [41u64, 43] {
+        let mut exec = wire::field_varint(1, 9);
+        exec.extend(wire::field_ld(field, &wire::field_str(1, "x")));
+        assert_eq!(
+            wire::decode_exec_server_message(&exec).unwrap().variant,
+            wire::ExecServerMessageVariant::OtherAllowlistPrecheck(field)
+        );
+    }
+
+    let reply = wire::encode_allowlist_precheck_result(9, "e", 42, true);
+    let result = wire::iter_fields(&reply)
+        .find(|f| f.field == 42)
+        .expect("mcp_allowlist_precheck_result field 42");
+    let allowed = wire::iter_fields(result.data)
+        .find(|f| f.field == 1)
+        .unwrap();
+    assert_eq!(allowed.varint, 1);
+}
