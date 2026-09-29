@@ -59,6 +59,8 @@ public actor Connection {
     private var targetSessionID: String?
     private var workingDirectory: String?
     private var subscribeRequestID: UInt64?
+    private var subscribeWasReattach = false
+    private var restartAsNewSession = false
     private var stopped = false
     /// Set when the server announced a reload; the next reconnect attempt
     /// skips backoff because the drop is expected and the server returns fast.
@@ -156,6 +158,11 @@ public actor Connection {
             }
             self.transport = nil
             if Task.isCancelled || stopped { break }
+            if restartAsNewSession {
+                restartAsNewSession = false
+                await transport.close()
+                continue
+            }
             if let reason = closeRequestedReason {
                 await transport.close()
                 yield(.phase(.failed(reason: reason)))
@@ -182,6 +189,7 @@ public actor Connection {
     private func subscribeAndSync() async throws {
         let sessionID = targetSessionID
         let directory = sessionID == nil ? workingDirectory : nil
+        subscribeWasReattach = sessionID != nil
         subscribeRequestID = try await send {
             .subscribe(
                 id: $0,
@@ -207,6 +215,11 @@ public actor Connection {
                     case .sessionCloseRequested(let reason):
                         closeRequestedReason =
                             reason.isEmpty ? "Server closed this session" : reason
+                    case .error(let id, _, _)
+                    where id == subscribeRequestID && subscribeWasReattach && workingDirectory != nil:
+                        targetSessionID = nil
+                        restartAsNewSession = true
+                        return
                     case .error(let id, let message, _) where id == subscribeRequestID:
                         closeRequestedReason = message
                     default:

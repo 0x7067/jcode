@@ -177,6 +177,89 @@ private func waitForSentLines(_ transport: FakeTransport, count: Int) async thro
     await connection.stop()
 }
 
+@Test(.timeLimit(.minutes(1))) func rejectedReattachStartsNewSessionInWorkspace() async throws {
+    let first = FakeTransport()
+    let second = FakeTransport()
+    let transports = TransportQueue([first, second])
+    let connection = Connection(
+        configuration: .init(
+            gateway: Gateway(host: "test.local"),
+            authToken: "tok",
+            maxReconnectAttempts: nil,
+            baseBackoffSeconds: 0.01
+        ),
+        makeTransport: { transports.next() }
+    )
+    let stream = await connection.start(resumeSessionID: "sess_gone", workingDirectory: "/repo")
+    var iterator = stream.makeAsyncIterator()
+    #expect(await iterator.next() == .phase(.connecting))
+    #expect(await iterator.next() == .phase(.connected))
+    _ = try await waitForSentLines(first, count: 1)
+
+    let message = "Unknown session 'sess_gone' or session has no working directory"
+    await first.push(#"{"type":"error","id":1,"message":"\#(message)"}"#)
+
+    let sent = try await waitForSentLines(second, count: 1)
+    #expect(sent.first?.contains("target_session_id") == false)
+    #expect(sent.first?.contains("\"working_dir\":\"\\/repo\"") == true)
+
+    await second.push(#"{"type":"session","session_id":"sess_new"}"#)
+    while let output = await iterator.next() {
+        if case .phase(.failed) = output {
+            Issue.record("a dropped session must not fail the connection")
+            break
+        }
+        if case .event(.error) = output {
+            Issue.record("the stale-session error must not reach the UI")
+            break
+        }
+        if case .event(.sessionID(let id)) = output {
+            #expect(id == "sess_new")
+            break
+        }
+    }
+    await connection.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) func rejectedReattachWithoutWorkspaceStillFails() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport, maxReconnectAttempts: nil)
+    let stream = await connection.start(resumeSessionID: "sess_gone")
+    var iterator = stream.makeAsyncIterator()
+    _ = await iterator.next()
+    _ = await iterator.next()
+    _ = try await waitForSentLines(transport, count: 1)
+
+    let message = "Unknown session 'sess_gone' or session has no working directory"
+    await transport.push(#"{"type":"error","id":1,"message":"\#(message)"}"#)
+
+    var sawFailed = false
+    while let output = await iterator.next() {
+        if case .phase(.failed(let reason)) = output {
+            #expect(reason == message)
+            sawFailed = true
+            break
+        }
+    }
+    #expect(sawFailed)
+    await connection.stop()
+}
+
+final class TransportQueue: @unchecked Sendable {
+    private let lock = NSLock()
+    private var transports: [FakeTransport]
+
+    init(_ transports: [FakeTransport]) {
+        self.transports = transports
+    }
+
+    func next() -> FakeTransport {
+        lock.lock()
+        defer { lock.unlock() }
+        return transports.count > 1 ? transports.removeFirst() : transports[0]
+    }
+}
+
 @Test func turnErrorsDoNotStopTheConnection() async throws {
     let transport = FakeTransport()
     let connection = makeConnection(transport: transport)
