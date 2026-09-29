@@ -137,8 +137,12 @@ public actor Connection {
 
     private func runLoop() async {
         var attempt = 0
+        var isFirstIteration = true
         while !Task.isCancelled && !stopped {
-            yield(.phase(attempt == 0 ? .connecting : .reconnecting(attempt: attempt)))
+            if isFirstIteration {
+                yield(.phase(.connecting))
+                isFirstIteration = false
+            }
             let transport = makeTransport()
             do {
                 try await transport.connect(
@@ -196,6 +200,7 @@ public actor Connection {
                 yield(.phase(.failed(reason: "Could not reach server after \(max) attempts")))
                 return
             }
+            yield(.phase(.reconnecting(attempt: attempt)))
             if expectServerReload {
                 // The server told us it is restarting: reconnect eagerly with a
                 // short fixed delay instead of exponential backoff.

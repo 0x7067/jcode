@@ -36,6 +36,13 @@ final class AppModel {
         session.phase == .connected
     }
 
+    var needsReconnect: Bool {
+        switch session.phase {
+        case .connected, .connecting: false
+        case .reconnecting, .disconnected, .failed: true
+        }
+    }
+
     var activeWorkspace: String? {
         activeServer?.activeWorkspace
     }
@@ -147,7 +154,7 @@ final class AppModel {
     }
 
     private func open(_ credential: ServerCredential, sessionID: String?) {
-        disconnect()
+        tearDownConnection()
         activeServer = credential
         let connection = Connection(
             configuration: .init(
@@ -163,7 +170,7 @@ final class AppModel {
                 workingDirectory: workingDirectory
             )
             for await output in stream {
-                guard let self else { return }
+                guard !Task.isCancelled, let self, self.connection === connection else { return }
                 self.session = SessionReducer.reduce(self.session, output)
                 self.observe(output)
             }
@@ -171,12 +178,16 @@ final class AppModel {
     }
 
     func disconnect() {
+        tearDownConnection()
+        session = SessionReducer.reduce(session, .phase(.disconnected))
+    }
+
+    private func tearDownConnection() {
         pumpTask?.cancel()
         pumpTask = nil
         let connection = connection
         self.connection = nil
         Task { await connection?.stop() }
-        session = SessionReducer.reduce(session, .phase(.disconnected))
     }
 
     // MARK: - Actions

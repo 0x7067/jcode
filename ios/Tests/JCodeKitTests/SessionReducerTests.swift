@@ -415,7 +415,7 @@ private func event(_ line: String) -> ConnectionOutput {
 @Test func reconnectDuringRetainedTurnKeepsProcessing() {
     var state = SessionReducer.reduce(SessionState(), intent: .userSentMessage("long task"))
     state = SessionReducer.reduce(state, .phase(.reconnecting(attempt: 1)))
-    #expect(!state.isProcessing)
+    #expect(state.isProcessing, "a transient drop must not flicker the stop button")
     state = run(
         [
             event(
@@ -427,6 +427,38 @@ private func event(_ line: String) -> ConnectionOutput {
     state = run(
         [event(#"{"type":"history","id":3,"session_id":"s","messages":[]}"#)], from: state)
     #expect(!state.isProcessing)
+}
+
+@Test func historyResyncKeepsRowIdentity() {
+    var state = SessionReducer.reduce(SessionState(), intent: .userSentMessage("q"))
+    state = run(
+        [
+            event(#"{"type":"text_delta","text":"partial"}"#),
+            .phase(.reconnecting(attempt: 1)),
+        ], from: state)
+    let before = state.transcript.map(\.id)
+    state = run(
+        [
+            event(
+                #"{"type":"history","id":2,"session_id":"s","messages":[{"role":"user","content":"q"},{"role":"assistant","content":"partial and more"},{"role":"user","content":"next"}]}"#
+            )
+        ], from: state)
+    #expect(Array(state.transcript.map(\.id).prefix(2)) == before)
+    #expect(state.transcript[1].text == "partial and more")
+    #expect(state.transcript.count == 3)
+}
+
+@Test func historyForDifferentConversationGetsFreshIdentity() {
+    var state = SessionReducer.reduce(SessionState(), intent: .userSentMessage("a"))
+    state = SessionReducer.reduce(state, intent: .userSentMessage("b"))
+    let old = state.transcript.map(\.id)
+    state = run(
+        [
+            event(
+                #"{"type":"history","id":2,"session_id":"s","messages":[{"role":"user","content":"x"},{"role":"user","content":"b"}]}"#
+            )
+        ], from: state)
+    #expect(state.transcript.allSatisfy { !old.contains($0.id) })
 }
 
 @Test func connectionPhaseTracksAndClears() {

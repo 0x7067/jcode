@@ -167,6 +167,7 @@ private func expectLive(_ iterator: inout AsyncStream<ConnectionOutput>.Iterator
     }
     #expect(!phases.contains(.connected))
     #expect(phases.contains(.reconnecting(attempt: 1)))
+    #expect(zip(phases, phases.dropFirst()).allSatisfy { $0 != $1 }, "phases: \(phases)")
     await connection.stop()
 }
 
@@ -289,12 +290,16 @@ private func expectLive(_ iterator: inout AsyncStream<ConnectionOutput>.Iterator
     )
     let stream = await connection.start(resumeSessionID: "sess_live", workingDirectory: "/repo")
     var failure: String?
+    var phases: [ConnectionPhase] = []
     for await output in stream {
+        if case .phase(let phase) = output { phases.append(phase) }
         if case .phase(.failed(let reason)) = output {
             failure = reason
             break
         }
     }
+    #expect(!phases.contains(.connected))
+    #expect(phases.filter { $0 == .connecting }.count == 1)
     var subscribes: [String] = []
     for transport in made.all {
         subscribes += await transport.sentLines.filter { $0.contains("\"subscribe\"") }
