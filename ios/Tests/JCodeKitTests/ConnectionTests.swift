@@ -9,6 +9,7 @@ actor FakeTransport: WebSocketTransport {
         case succeed
         case failConnect
         case unauthorized
+        case unauthorizedOnSend
     }
 
     let behavior: Behavior
@@ -32,6 +33,7 @@ actor FakeTransport: WebSocketTransport {
 
     func send(text: String) async throws {
         if closed { throw TransportError.notConnected }
+        if behavior == .unauthorizedOnSend { throw TransportError.unauthorized }
         sentLines.append(text)
     }
 
@@ -86,6 +88,37 @@ private func waitForSentLines(_ transport: FakeTransport, count: Int) async thro
         try await Task.sleep(nanoseconds: 5_000_000)
     }
     return sent
+}
+
+@Test func unauthorizedOnFirstSendAsksForRePair() async throws {
+    let transport = FakeTransport(behavior: .unauthorizedOnSend)
+    let connection = Connection(
+        configuration: .init(
+            gateway: Gateway(host: "test.local"),
+            authToken: "tok",
+            maxReconnectAttempts: nil,
+            baseBackoffSeconds: 0.01
+        ),
+        makeTransport: { transport }
+    )
+    let stream = await connection.start(workingDirectory: "/repo")
+    var phases: [ConnectionPhase] = []
+    for await output in stream {
+        if case let .phase(phase) = output {
+            phases.append(phase)
+            if case .failed = phase { break }
+            if case .reconnecting = phase {
+                Issue.record("must not reconnect after a 401")
+                break
+            }
+        }
+    }
+    guard case .failed(let reason)? = phases.last else {
+        Issue.record("expected failed phase, got \(phases)")
+        return
+    }
+    #expect(reason.contains("Re-pair"))
+    await connection.stop()
 }
 
 @Test func newSessionSubscribeSendsWorkingDirectory() async throws {

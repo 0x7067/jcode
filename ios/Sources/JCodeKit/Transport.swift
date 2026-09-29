@@ -28,13 +28,15 @@ public actor URLSessionWebSocketTransport: WebSocketTransport {
         let task = URLSession.shared.webSocketTask(with: request)
         task.resume()
         self.task = task
-        // The first protocol request completes the WebSocket handshake. A preflight
-        // ping can hang indefinitely on private-tailnet ws:// connections on iOS.
     }
 
     public func send(text: String) async throws {
         guard let task else { throw TransportError.notConnected }
-        try await task.send(.string(text))
+        do {
+            try await task.send(.string(text))
+        } catch {
+            throw Self.classify(error, task: task)
+        }
     }
 
     public func receiveText() async throws -> String? {
@@ -49,7 +51,7 @@ public actor URLSessionWebSocketTransport: WebSocketTransport {
                 if task.closeCode != .invalid {
                     return nil
                 }
-                throw error
+                throw Self.classify(error, task: task)
             }
             switch message {
             case .string(let text):
@@ -67,6 +69,13 @@ public actor URLSessionWebSocketTransport: WebSocketTransport {
     public func close() async {
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
+    }
+
+    private static func classify(_ error: Error, task: URLSessionWebSocketTask) -> Error {
+        if let http = task.response as? HTTPURLResponse, http.statusCode == 401 {
+            return TransportError.unauthorized
+        }
+        return error
     }
 }
 
