@@ -1,0 +1,16 @@
+ios/Sources/JCodeKit/Transport.swift
+  h_29be57c0addd47 35-39,54,73-79
+ios/Tests/JCodeKitTests/ConnectionTests.swift
+  h_29be57c0addd47 12,36,93-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d278ece473dff1f2857b11da09759cb95fb0447",
+  "prompts": {},
+  "humans": {
+    "h_29be57c0addd47": {
+      "author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
