@@ -1,0 +1,19 @@
+ios/Sources/JCodeKit/Transport.swift
+  s_b4aa746b515b2b::t_11151736a3b615 35-39,54,73-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f8544c6e6058af4fb389aa781c525c11e35d2dde",
+  "prompts": {},
+  "sessions": {
+    "s_b4aa746b515b2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f479b117-f243-49ed-a4cd-dc1d6f2dcb75",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
