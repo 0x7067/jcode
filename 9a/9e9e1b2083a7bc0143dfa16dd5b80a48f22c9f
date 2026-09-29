@@ -1,0 +1,51 @@
+ios/Sources/JCodeKit/Connection.swift
+  s_6cc6de7afd2887::t_0b93ad6bfa5302 60-61,82-85,87,184-185,189,210-211
+ios/Sources/JCodeKit/CredentialStore.swift
+  s_6cc6de7afd2887::t_0f18d38c0b0b95 13-15,23-24,32-47,53-89
+ios/Sources/JCodeKit/Wire.swift
+  s_6cc6de7afd2887::t_9622cc96bf848c 9-11,27,40,43-45
+ios/Sources/JCodeMobile/AppModel.swift
+  s_b4aa746b515b2b::t_7da1e4206c2a10 27,39-46,82,84-88,96,100-141,152,154-157,161
+ios/Sources/JCodeMobile/Views/ChatView.swift
+  s_879982f9b55d6a::t_d205ffef0da186 9,66-71,107-120,122-124,166-171
+ios/Sources/JCodeMobile/Views/SettingsView.swift
+  s_879982f9b55d6a::t_10862a0cb54d03 11,19,64-97
+ios/Sources/JCodeMobile/Views/WorkspacePickerView.swift
+  s_879982f9b55d6a::t_9ba911a9fd6b3c 1-143
+ios/Tests/JCodeKitTests/ConnectionTests.swift
+  s_b4aa746b515b2b::t_07ccc79e86abc2 67-69,74,81-164
+ios/Tests/JCodeKitTests/WireTests.swift
+  s_b4aa746b515b2b::t_b846557943f9eb 51-53,57,60-62,65-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9a9e9e1b2083a7bc0143dfa16dd5b80a48f22c9f",
+  "prompts": {},
+  "sessions": {
+    "s_6cc6de7afd2887": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0de49-6b39-7373-86fc-b8f77f056fe2",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    },
+    "s_879982f9b55d6a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0edf6-ef4c-7950-a2ae-62a839c29d57",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    },
+    "s_b4aa746b515b2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f479b117-f243-49ed-a4cd-dc1d6f2dcb75",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
