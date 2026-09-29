@@ -57,6 +57,8 @@ public actor Connection {
     private var runTask: Task<Void, Never>?
     private var continuation: AsyncStream<ConnectionOutput>.Continuation?
     private var targetSessionID: String?
+    private var workingDirectory: String?
+    private var subscribeRequestID: UInt64?
     private var stopped = false
     /// Set when the server announced a reload; the next reconnect attempt
     /// skips backoff because the drop is expected and the server returns fast.
@@ -77,8 +79,12 @@ public actor Connection {
 
     /// Starts the connection loop. The returned stream yields phase changes
     /// and decoded events until `stop()` is called or the stream is cancelled.
-    public func start(resumeSessionID: String? = nil) -> AsyncStream<ConnectionOutput> {
+    public func start(
+        resumeSessionID: String? = nil,
+        workingDirectory: String? = nil
+    ) -> AsyncStream<ConnectionOutput> {
         targetSessionID = resumeSessionID
+        self.workingDirectory = workingDirectory
         stopped = false
         expectServerReload = false
         closeRequestedReason = nil
@@ -175,10 +181,12 @@ public actor Connection {
 
     private func subscribeAndSync() async throws {
         let sessionID = targetSessionID
-        try await send {
+        let directory = sessionID == nil ? workingDirectory : nil
+        subscribeRequestID = try await send {
             .subscribe(
                 id: $0,
                 targetSessionID: sessionID,
+                workingDirectory: directory,
                 continueOnDisconnect: true
             )
         }
@@ -199,6 +207,8 @@ public actor Connection {
                     case .sessionCloseRequested(let reason):
                         closeRequestedReason =
                             reason.isEmpty ? "Server closed this session" : reason
+                    case .error(let id, let message, _) where id == subscribeRequestID:
+                        closeRequestedReason = message
                     default:
                         break
                     }

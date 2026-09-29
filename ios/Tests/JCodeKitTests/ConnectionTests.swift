@@ -64,16 +64,102 @@ actor FakeTransport: WebSocketTransport {
     }
 }
 
-private func makeConnection(transport: FakeTransport) -> Connection {
+private func makeConnection(
+    transport: FakeTransport, maxReconnectAttempts: Int? = 1
+) -> Connection {
     Connection(
         configuration: .init(
             gateway: Gateway(host: "test.local"),
             authToken: "tok",
-            maxReconnectAttempts: 1,
+            maxReconnectAttempts: maxReconnectAttempts,
             baseBackoffSeconds: 0.01
         ),
         makeTransport: { transport }
     )
+}
+
+private func waitForSentLines(_ transport: FakeTransport, count: Int) async throws -> [String] {
+    var sent: [String] = []
+    for _ in 0..<100 {
+        sent = await transport.sentLines
+        if sent.count >= count { break }
+        try await Task.sleep(nanoseconds: 5_000_000)
+    }
+    return sent
+}
+
+@Test func newSessionSubscribeSendsWorkingDirectory() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport)
+    let stream = await connection.start(workingDirectory: "/Users/me/repo")
+    var iterator = stream.makeAsyncIterator()
+    _ = await iterator.next()
+    _ = await iterator.next()
+
+    let sent = try await waitForSentLines(transport, count: 1)
+    #expect(sent.first?.contains("\"working_dir\":\"\\/Users\\/me\\/repo\"") == true)
+    await connection.stop()
+}
+
+@Test func reattachSubscribeOmitsWorkingDirectory() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport)
+    let stream = await connection.start(
+        resumeSessionID: "sess_1", workingDirectory: "/Users/me/repo")
+    var iterator = stream.makeAsyncIterator()
+    _ = await iterator.next()
+    _ = await iterator.next()
+
+    let sent = try await waitForSentLines(transport, count: 1)
+    #expect(sent.first?.contains("\"target_session_id\":\"sess_1\"") == true)
+    #expect(sent.first?.contains("working_dir") == false)
+    await connection.stop()
+}
+
+@Test func subscribeRejectionFailsWithoutReconnecting() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport, maxReconnectAttempts: nil)
+    let stream = await connection.start(workingDirectory: "/missing")
+    var iterator = stream.makeAsyncIterator()
+    #expect(await iterator.next() == .phase(.connecting))
+    #expect(await iterator.next() == .phase(.connected))
+    _ = try await waitForSentLines(transport, count: 1)
+
+    let message = "Remote working directory must exist and be a directory on the server: /missing"
+    await transport.push(#"{"type":"error","id":1,"message":"\#(message)"}"#)
+
+    var sawFailed = false
+    while let output = await iterator.next() {
+        if case .phase(.reconnecting) = output {
+            Issue.record("must not reconnect after a rejected subscribe")
+            break
+        }
+        if case .phase(.failed(let reason)) = output {
+            #expect(reason == message)
+            sawFailed = true
+            break
+        }
+    }
+    #expect(sawFailed)
+    await connection.stop()
+}
+
+@Test func turnErrorsDoNotStopTheConnection() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport)
+    let stream = await connection.start(workingDirectory: "/repo")
+    var iterator = stream.makeAsyncIterator()
+    _ = await iterator.next()
+    _ = await iterator.next()
+    _ = try await waitForSentLines(transport, count: 2)
+
+    await transport.push(#"{"type":"error","id":7,"message":"rate limited"}"#)
+    #expect(
+        await iterator.next()
+            == .event(.error(id: 7, message: "rate limited", retryAfterSecs: nil)))
+    await transport.push(#"{"type":"text_delta","text":"still here"}"#)
+    #expect(await iterator.next() == .event(.textDelta(text: "still here")))
+    await connection.stop()
 }
 
 @Test func connectSubscribesAndSyncsHistory() async throws {
