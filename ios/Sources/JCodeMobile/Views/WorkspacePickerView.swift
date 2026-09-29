@@ -27,11 +27,13 @@ struct WorkspacePickerView: View {
                         .listRowBackground(Theme.surface)
                         .accessibilityLabel("Workspace path")
                         .accessibilityHint("Absolute path of a folder on the server")
+                        .accessibilityIdentifier("workspace-path")
                     Button(action: open) {
                         Label("Open workspace", systemImage: "folder")
                             .foregroundStyle(canOpen ? Theme.mint : Theme.textTertiary)
                     }
                     .disabled(!canOpen)
+                    .accessibilityIdentifier("workspace-open")
                     .listRowBackground(Theme.surface)
                 } header: {
                     Text("Folder on \(model.activeServer?.serverName ?? "server")")
