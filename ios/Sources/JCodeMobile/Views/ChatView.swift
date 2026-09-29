@@ -5,19 +5,22 @@ import SwiftUI
 struct ChatView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.compactEdgePads) private var edgePads
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showSettings = false
     @State private var sendCount = 0
+    @State private var bannerVisible = false
 
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 0) {
             header
 
-            if showConnectionBanner {
+            if bannerVisible {
                 ConnectionBanner(phase: model.session.phase) {
                     model.retryConnection()
                 }
                 .padding(.bottom, 8)
+                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
 
             if let banner = model.session.errorBanner {
@@ -61,6 +64,15 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .task(id: showConnectionBanner) {
+            if showConnectionBanner, case .reconnecting = model.session.phase {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if Task.isCancelled { return }
+            }
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+                bannerVisible = showConnectionBanner
+            }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: sendCount)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: finishedToolCallCount) {
