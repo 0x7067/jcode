@@ -95,6 +95,7 @@ private func makeConnection(transport: FakeTransport) -> Connection {
     }
     #expect(sent.count == 2)
     #expect(sent[0].contains("\"type\":\"subscribe\""))
+    #expect(sent[0].contains("\"continue_on_disconnect\":true"))
     #expect(sent[1].contains("\"type\":\"get_history\""))
 
     await connection.stop()

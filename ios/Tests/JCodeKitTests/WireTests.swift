@@ -47,12 +47,16 @@ private func encodedObject(_ request: Request) throws -> [String: Any] {
 }
 
 @Test func encodesSubscribeWithTargetSession() throws {
-    let object = try encodedObject(.subscribe(id: 1, targetSessionID: "sess_abc"))
+    let object = try encodedObject(
+        .subscribe(id: 1, targetSessionID: "sess_abc", continueOnDisconnect: true))
     #expect(object["type"] as? String == "subscribe")
     #expect(object["target_session_id"] as? String == "sess_abc")
+    #expect(object["continue_on_disconnect"] as? Bool == true)
 
-    let bare = try encodedObject(.subscribe(id: 2, targetSessionID: nil))
+    let bare = try encodedObject(
+        .subscribe(id: 2, targetSessionID: nil, continueOnDisconnect: false))
     #expect(bare["target_session_id"] == nil)
+    #expect(bare["continue_on_disconnect"] as? Bool == false)
 }
 
 @Test func encodesControlRequests() throws {

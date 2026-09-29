@@ -175,7 +175,13 @@ public actor Connection {
 
     private func subscribeAndSync() async throws {
         let sessionID = targetSessionID
-        try await send { .subscribe(id: $0, targetSessionID: sessionID) }
+        try await send {
+            .subscribe(
+                id: $0,
+                targetSessionID: sessionID,
+                continueOnDisconnect: true
+            )
+        }
         try await send { .getHistory(id: $0) }
     }
 
