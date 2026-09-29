@@ -75,3 +75,13 @@ public struct PairingClient: Sendable {
         return http.statusCode == 200
     }
 }
+
+public enum PairingFailure {
+    public static func message(for error: Error, gateway: Gateway) -> String {
+        let target = "\(gateway.host):\(gateway.port)"
+        if (error as? URLError)?.code == .appTransportSecurityRequiresSecureConnection {
+            return "Could not reach \(target): iOS blocked the plain HTTP connection to this address. Use a local network address or put the gateway behind HTTPS."
+        }
+        return "Could not reach \(target): \(error.localizedDescription)"
+    }
+}

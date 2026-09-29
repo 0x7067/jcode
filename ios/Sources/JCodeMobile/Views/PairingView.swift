@@ -188,7 +188,7 @@ struct PairingView: View {
                     errorMessage = "Unexpected response from server"
                 }
             } catch {
-                errorMessage = "Could not reach \(gateway.host):\(gateway.port)"
+                errorMessage = PairingFailure.message(for: error, gateway: gateway)
             }
         }
     }

@@ -5,6 +5,22 @@ import Testing
 
 // MARK: - Gateway / PairURI
 
+@Test func pairingFailureExplainsATSBlocks() {
+    let gateway = Gateway(host: "100.64.0.8")
+    let message = PairingFailure.message(
+        for: URLError(.appTransportSecurityRequiresSecureConnection), gateway: gateway)
+    #expect(message.hasPrefix("Could not reach 100.64.0.8:7643: "))
+    #expect(message.contains("plain HTTP"))
+    #expect(message.contains("HTTPS"))
+}
+
+@Test func pairingFailureIncludesTheUnderlyingError() {
+    let gateway = Gateway(host: "devbox.tailnet.ts.net")
+    let error = URLError(.cannotConnectToHost)
+    let message = PairingFailure.message(for: error, gateway: gateway)
+    #expect(message == "Could not reach devbox.tailnet.ts.net:7643: \(error.localizedDescription)")
+}
+
 @Test func gatewayBuildsEndpoints() {
     let gateway = Gateway(host: "devbox.tailnet.ts.net")
     #expect(gateway.healthURL.absoluteString == "http://devbox.tailnet.ts.net:7643/health")
