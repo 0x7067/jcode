@@ -36,17 +36,20 @@ public actor Connection {
         public var maxReconnectAttempts: Int?
         /// Base backoff delay in seconds, doubled per attempt and capped at 30s.
         public var baseBackoffSeconds: Double
+        public var firstReplyTimeoutSeconds: Double
 
         public init(
             gateway: Gateway,
             authToken: String,
             maxReconnectAttempts: Int? = nil,
-            baseBackoffSeconds: Double = 1.0
+            baseBackoffSeconds: Double = 1.0,
+            firstReplyTimeoutSeconds: Double = 15
         ) {
             self.gateway = gateway
             self.authToken = authToken
             self.maxReconnectAttempts = maxReconnectAttempts
             self.baseBackoffSeconds = baseBackoffSeconds
+            self.firstReplyTimeoutSeconds = firstReplyTimeoutSeconds
         }
     }
 
@@ -69,6 +72,7 @@ public actor Connection {
     /// Set when the server announced a reload; the next reconnect attempt
     /// skips backoff because the drop is expected and the server returns fast.
     private var expectServerReload = false
+    private var receivedSinceConnect = false
     /// Set when the server asked this client to close; reconnecting would
     /// fight the server, so the loop ends with a failed phase instead.
     private var closeRequestedReason: String?
@@ -141,6 +145,9 @@ public actor Connection {
                     authToken: configuration.authToken
                 )
                 self.transport = transport
+                receivedSinceConnect = false
+                let watchdog = startFirstReplyWatchdog(transport: transport)
+                defer { watchdog.cancel() }
                 try await subscribeAndSync()
                 yield(.phase(.connected))
                 attempt = 0
@@ -220,6 +227,7 @@ public actor Connection {
     private func receiveLoop(transport: any WebSocketTransport) async throws {
         while !Task.isCancelled && !stopped {
             guard let text = try await transport.receiveText() else { return }
+            receivedSinceConnect = true
             // A frame may contain multiple newline-delimited events.
             for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
                 if let event = try? ServerEvent.decode(line: String(line)) {
@@ -253,6 +261,17 @@ public actor Connection {
                     yield(.event(event))
                     if closeRequestedReason != nil { return }
                 }
+            }
+        }
+    }
+
+    private func startFirstReplyWatchdog(transport: any WebSocketTransport) -> Task<Void, Never> {
+        let seconds = configuration.firstReplyTimeoutSeconds
+        return Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            if await !self.receivedSinceConnect {
+                await transport.close()
             }
         }
     }

@@ -11,6 +11,7 @@ actor FakeTransport: WebSocketTransport {
         case unauthorized
         case unauthorizedOnSend
         case unreachableOnSend
+        case silent
     }
 
     let behavior: Behavior
@@ -18,6 +19,7 @@ actor FakeTransport: WebSocketTransport {
     private(set) var sentLines: [String] = []
     private var incoming: [String] = []
     private var waiters: [CheckedContinuation<String?, Never>] = []
+    private var stalledSends: [CheckedContinuation<Void, Never>] = []
     private var closed = false
 
     init(behavior: Behavior = .succeed, autoReply: String? = nil) {
@@ -38,6 +40,10 @@ actor FakeTransport: WebSocketTransport {
         if closed { throw TransportError.notConnected }
         if behavior == .unauthorizedOnSend { throw TransportError.unauthorized }
         if behavior == .unreachableOnSend { throw URLError(.cannotConnectToHost) }
+        if behavior == .silent {
+            await withCheckedContinuation { stalledSends.append($0) }
+            throw URLError(.cancelled)
+        }
         sentLines.append(text)
         if let autoReply, sentLines.count == 1,
             let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
@@ -63,6 +69,10 @@ actor FakeTransport: WebSocketTransport {
             waiter.resume(returning: nil)
         }
         waiters.removeAll()
+        for send in stalledSends {
+            send.resume()
+        }
+        stalledSends.removeAll()
     }
 
     /// Test helper: push a server frame to the client.
@@ -296,6 +306,36 @@ final class MadeTransports: @unchecked Sendable {
         defer { lock.unlock() }
         return transports
     }
+}
+
+@Test(.timeLimit(.minutes(1))) func silentServerTimesOutAndRetries() async throws {
+    let made = MadeTransports()
+    let connection = Connection(
+        configuration: .init(
+            gateway: Gateway(host: "test.local"),
+            authToken: "tok",
+            maxReconnectAttempts: 2,
+            baseBackoffSeconds: 0.01,
+            firstReplyTimeoutSeconds: 0.2
+        ),
+        makeTransport: {
+            let transport = FakeTransport(behavior: .silent)
+            made.append(transport)
+            return transport
+        }
+    )
+    let stream = await connection.start(workingDirectory: "/repo")
+    var phases: [ConnectionPhase] = []
+    for await output in stream {
+        guard case .phase(let phase) = output else { continue }
+        phases.append(phase)
+        if case .failed = phase { break }
+    }
+    #expect(phases.contains(.reconnecting(attempt: 1)))
+    #expect(phases.contains(.reconnecting(attempt: 2)))
+    #expect(!phases.contains(.connected))
+    #expect(made.all.count == 3)
+    await connection.stop()
 }
 
 @Test(.timeLimit(.minutes(1))) func otherReattachRejectionDoesNotStartNewSession() async throws {
