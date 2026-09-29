@@ -61,6 +61,12 @@ struct WorkspacePickerView: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") { dismiss() }
                     }
+                } else if let server = model.activeServer {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Change server") { model.removeServer(server) }
+                            .accessibilityHint("Forgets this server so you can pair a different one")
+                            .accessibilityIdentifier("workspace-change-server")
+                    }
                 }
             }
         }

@@ -321,6 +321,19 @@ private func encodedObject(_ request: Request) throws -> [String: Any] {
     #expect(payload.reasoningEffort == "medium")
 }
 
+@Test func historyCarriesProcessingActivity() throws {
+    let busy = #"{"type":"history","id":1,"session_id":"s","messages":[],"activity":{"is_processing":true}}"#
+    let idle = #"{"type":"history","id":1,"session_id":"s","messages":[]}"#
+    guard case let .history(busyPayload) = try ServerEvent.decode(line: busy),
+        case let .history(idlePayload) = try ServerEvent.decode(line: idle)
+    else {
+        Issue.record("expected history events")
+        return
+    }
+    #expect(busyPayload.isProcessing)
+    #expect(!idlePayload.isProcessing)
+}
+
 @Test func malformedLinesThrow() {
     #expect(throws: WireError.self) {
         try ServerEvent.decode(line: "not json")

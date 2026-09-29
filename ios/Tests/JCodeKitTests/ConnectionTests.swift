@@ -14,13 +14,15 @@ actor FakeTransport: WebSocketTransport {
     }
 
     let behavior: Behavior
+    let autoReply: String?
     private(set) var sentLines: [String] = []
     private var incoming: [String] = []
     private var waiters: [CheckedContinuation<String?, Never>] = []
     private var closed = false
 
-    init(behavior: Behavior = .succeed) {
+    init(behavior: Behavior = .succeed, autoReply: String? = nil) {
         self.behavior = behavior
+        self.autoReply = autoReply
     }
 
     func connect(url: URL, authToken: String) async throws {
@@ -37,6 +39,12 @@ actor FakeTransport: WebSocketTransport {
         if behavior == .unauthorizedOnSend { throw TransportError.unauthorized }
         if behavior == .unreachableOnSend { throw URLError(.cannotConnectToHost) }
         sentLines.append(text)
+        if let autoReply, sentLines.count == 1,
+            let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+            let id = object["id"] as? Int
+        {
+            push(autoReply.replacingOccurrences(of: #""id":1"#, with: "\"id\":\(id)"))
+        }
     }
 
     func receiveText() async throws -> String? {
@@ -235,6 +243,79 @@ private func waitForSentLines(_ transport: FakeTransport, count: Int) async thro
             break
         }
     }
+    await connection.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) func busyReattachRetriesSameSessionThenGivesUp() async throws {
+    let message = "Session 'sess_live' is already live but could not be shared safely with this connection."
+    let made = MadeTransports()
+    let connection = Connection(
+        configuration: .init(
+            gateway: Gateway(host: "test.local"),
+            authToken: "tok",
+            maxReconnectAttempts: nil,
+            baseBackoffSeconds: 0.01
+        ),
+        makeTransport: {
+            let transport = FakeTransport(
+                autoReply: #"{"type":"error","id":1,"message":"\#(message)","retry_after_secs":0}"#)
+            made.append(transport)
+            return transport
+        }
+    )
+    let stream = await connection.start(resumeSessionID: "sess_live", workingDirectory: "/repo")
+    var failure: String?
+    for await output in stream {
+        if case .phase(.failed(let reason)) = output {
+            failure = reason
+            break
+        }
+    }
+    var subscribes: [String] = []
+    for transport in made.all {
+        subscribes += await transport.sentLines.filter { $0.contains("\"subscribe\"") }
+    }
+    #expect(failure == message)
+    #expect(subscribes.count == Connection.maxBusyReattachAttempts + 1)
+    #expect(subscribes.allSatisfy { $0.contains("\"target_session_id\":\"sess_live\"") })
+    await connection.stop()
+}
+
+final class MadeTransports: @unchecked Sendable {
+    private let lock = NSLock()
+    private var transports: [FakeTransport] = []
+
+    func append(_ transport: FakeTransport) {
+        lock.lock()
+        transports.append(transport)
+        lock.unlock()
+    }
+
+    var all: [FakeTransport] {
+        lock.lock()
+        defer { lock.unlock() }
+        return transports
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) func otherReattachRejectionDoesNotStartNewSession() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport, maxReconnectAttempts: nil)
+    let stream = await connection.start(resumeSessionID: "sess_x", workingDirectory: "/repo")
+    var iterator = stream.makeAsyncIterator()
+    _ = await iterator.next()
+    _ = try await waitForSentLines(transport, count: 1)
+    await transport.push(#"{"type":"error","id":1,"message":"Session is closed"}"#)
+    var failure: String?
+    while let output = await iterator.next() {
+        if case .phase(.failed(let reason)) = output {
+            failure = reason
+            break
+        }
+    }
+    #expect(failure == "Session is closed")
+    let sent = await transport.sentLines.filter { $0.contains("\"subscribe\"") }
+    #expect(sent.count == 1)
     await connection.stop()
 }
 

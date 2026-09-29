@@ -170,6 +170,7 @@ public enum ServerEvent: Equatable, Sendable {
         public var serverVersion: String?
         public var displayTitle: String?
         public var reasoningEffort: String?
+        public var isProcessing: Bool
 
         public struct TokenTotals: Equatable, Sendable {
             public var input: UInt64
@@ -192,7 +193,8 @@ public enum ServerEvent: Equatable, Sendable {
             allSessions: [String] = [],
             serverVersion: String? = nil,
             displayTitle: String? = nil,
-            reasoningEffort: String? = nil
+            reasoningEffort: String? = nil,
+            isProcessing: Bool = false
         ) {
             self.id = id
             self.sessionID = sessionID
@@ -205,6 +207,7 @@ public enum ServerEvent: Equatable, Sendable {
             self.serverVersion = serverVersion
             self.displayTitle = displayTitle
             self.reasoningEffort = reasoningEffort
+            self.isProcessing = isProcessing
         }
     }
 
@@ -368,7 +371,8 @@ public enum ServerEvent: Equatable, Sendable {
             allSessions: json.stringArray("all_sessions"),
             serverVersion: json.optionalString("server_version"),
             displayTitle: json.optionalString("display_title"),
-            reasoningEffort: json.optionalString("reasoning_effort")
+            reasoningEffort: json.optionalString("reasoning_effort"),
+            isProcessing: json.optionalObject("activity")?.bool("is_processing") ?? false
         )
     }
 }

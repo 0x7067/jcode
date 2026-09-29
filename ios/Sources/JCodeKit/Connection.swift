@@ -61,6 +61,10 @@ public actor Connection {
     private var subscribeRequestID: UInt64?
     private var subscribeWasReattach = false
     private var restartAsNewSession = false
+    private var retryReattachAfter: UInt64?
+    private var busyReattachAttempts = 0
+    private var busyReattachMessage: String?
+    static let maxBusyReattachAttempts = 5
     private var stopped = false
     /// Set when the server announced a reload; the next reconnect attempt
     /// skips backoff because the drop is expected and the server returns fast.
@@ -163,6 +167,18 @@ public actor Connection {
                 await transport.close()
                 continue
             }
+            if let seconds = retryReattachAfter {
+                retryReattachAfter = nil
+                await transport.close()
+                busyReattachAttempts += 1
+                if busyReattachAttempts > Self.maxBusyReattachAttempts {
+                    yield(.phase(.failed(reason: busyReattachMessage ?? "Session is busy on another connection")))
+                    return
+                }
+                yield(.phase(.reconnecting(attempt: busyReattachAttempts)))
+                try? await Task.sleep(nanoseconds: max(seconds, 1) * 1_000_000_000)
+                continue
+            }
             if let reason = closeRequestedReason {
                 await transport.close()
                 yield(.phase(.failed(reason: reason)))
@@ -215,11 +231,20 @@ public actor Connection {
                     case .sessionCloseRequested(let reason):
                         closeRequestedReason =
                             reason.isEmpty ? "Server closed this session" : reason
-                    case .error(let id, _, _)
-                    where id == subscribeRequestID && subscribeWasReattach && workingDirectory != nil:
+                    case .error(let id, let message, _)
+                    where id == subscribeRequestID && subscribeWasReattach
+                        && workingDirectory != nil && message.hasPrefix("Unknown session "):
                         targetSessionID = nil
                         restartAsNewSession = true
                         return
+                    case .error(let id, let message, let retryAfter?)
+                    where id == subscribeRequestID && subscribeWasReattach:
+                        retryReattachAfter = retryAfter
+                        busyReattachMessage = message
+                        return
+                    case .history:
+                        busyReattachAttempts = 0
+                        busyReattachMessage = nil
                     case .error(let id, let message, _) where id == subscribeRequestID:
                         closeRequestedReason = message
                     default:
