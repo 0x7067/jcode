@@ -65,13 +65,13 @@ struct ChatView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        .task(id: showConnectionBanner) {
-            if showConnectionBanner, case .reconnecting = model.session.phase {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+        .task(id: connectionBannerDelay) {
+            if let delay = connectionBannerDelay, delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
                 if Task.isCancelled { return }
             }
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
-                bannerVisible = showConnectionBanner
+            withAnimation(.easeInOut(duration: 0.3)) {
+                bannerVisible = connectionBannerDelay != nil
             }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: sendCount)
@@ -83,10 +83,11 @@ struct ChatView: View {
         }
     }
 
-    private var showConnectionBanner: Bool {
+    private var connectionBannerDelay: UInt64? {
         switch model.session.phase {
-        case .reconnecting, .disconnected, .failed: true
-        case .connected, .connecting: false
+        case .reconnecting: 2_000_000_000
+        case .disconnected, .failed: 0
+        case .connected, .connecting: nil
         }
     }
 
