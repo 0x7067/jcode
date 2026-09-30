@@ -412,6 +412,7 @@ public enum SessionReducer {
         _ state: SessionState, _ payload: ServerEvent.HistoryPayload
     ) -> SessionState {
         var state = state
+        let isSameSession = state.sessionID == payload.sessionID
         state.sessionID = payload.sessionID
         state.providerName = payload.providerName ?? state.providerName
         state.modelName = payload.providerModel ?? state.modelName
@@ -468,7 +469,9 @@ public enum SessionReducer {
             }
             return TranscriptEntry(role: role, text: message.content, toolCalls: toolCalls)
         }
-        preserveIdentities(of: &entries, from: state.transcript)
+        if isSameSession {
+            preserveIdentities(of: &entries, from: state.transcript)
+        }
         state.transcript = entries
         return state
     }

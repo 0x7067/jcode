@@ -433,6 +433,7 @@ private func event(_ line: String) -> ConnectionOutput {
     var state = SessionReducer.reduce(SessionState(), intent: .userSentMessage("q"))
     state = run(
         [
+            event(#"{"type":"session","session_id":"s"}"#),
             event(#"{"type":"text_delta","text":"partial"}"#),
             .phase(.reconnecting(attempt: 1)),
         ], from: state)
@@ -458,6 +459,19 @@ private func event(_ line: String) -> ConnectionOutput {
                 #"{"type":"history","id":2,"session_id":"s","messages":[{"role":"user","content":"x"},{"role":"user","content":"b"}]}"#
             )
         ], from: state)
+    #expect(state.transcript.allSatisfy { !old.contains($0.id) })
+}
+
+@Test func historyForAnotherSessionGetsFreshIdentity() {
+    var state = SessionReducer.reduce(SessionState(), intent: .userSentMessage("from the old session"))
+    let old = state.transcript.map(\.id)
+    state = run(
+        [
+            event(
+                #"{"type":"history","id":2,"session_id":"other","messages":[{"role":"user","content":"unrelated"}]}"#
+            )
+        ], from: state)
+    #expect(state.transcript.map(\.text) == ["unrelated"])
     #expect(state.transcript.allSatisfy { !old.contains($0.id) })
 }
 
