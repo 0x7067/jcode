@@ -62,6 +62,7 @@ public actor Connection {
     private var targetSessionID: String?
     private var workingDirectory: String?
     private var subscribeRequestID: UInt64?
+    private var historyRequestID: UInt64?
     private var subscribeWasReattach = false
     private var restartAsNewSession = false
     private var retryReattachAfter: UInt64?
@@ -149,7 +150,6 @@ public actor Connection {
                 let watchdog = startFirstReplyWatchdog(transport: transport)
                 defer { watchdog.cancel() }
                 try await subscribeAndSync()
-                yield(.phase(.connected))
                 attempt = 0
                 try await receiveLoop(transport: transport)
                 // Clean close: fall through to reconnect.
@@ -221,7 +221,7 @@ public actor Connection {
                 continueOnDisconnect: true
             )
         }
-        try await send { .getHistory(id: $0) }
+        historyRequestID = try await send { .getHistory(id: $0) }
     }
 
     private func receiveLoop(transport: any WebSocketTransport) async throws {
@@ -250,9 +250,15 @@ public actor Connection {
                         retryReattachAfter = retryAfter
                         busyReattachMessage = message
                         return
-                    case .history:
+                    case .done(let id) where id == subscribeRequestID:
+                        continue
+                    case .history(let payload):
                         busyReattachAttempts = 0
                         busyReattachMessage = nil
+                        if payload.id == historyRequestID {
+                            historyRequestID = nil
+                            yield(.phase(.connected))
+                        }
                     case .error(let id, let message, _) where id == subscribeRequestID:
                         closeRequestedReason = message
                     default:

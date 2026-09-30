@@ -16,15 +16,17 @@ actor FakeTransport: WebSocketTransport {
 
     let behavior: Behavior
     let autoReply: String?
+    let repliesToHistory: Bool
     private(set) var sentLines: [String] = []
     private var incoming: [String] = []
     private var waiters: [CheckedContinuation<String?, Never>] = []
     private var stalledSends: [CheckedContinuation<Void, Never>] = []
     private var closed = false
 
-    init(behavior: Behavior = .succeed, autoReply: String? = nil) {
+    init(behavior: Behavior = .succeed, autoReply: String? = nil, repliesToHistory: Bool = true) {
         self.behavior = behavior
         self.autoReply = autoReply
+        self.repliesToHistory = repliesToHistory
     }
 
     func connect(url: URL, authToken: String) async throws {
@@ -45,11 +47,14 @@ actor FakeTransport: WebSocketTransport {
             throw URLError(.cancelled)
         }
         sentLines.append(text)
-        if let autoReply, sentLines.count == 1,
-            let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+        guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
             let id = object["id"] as? Int
-        {
+        else { return }
+        if let autoReply, sentLines.count == 1 {
             push(autoReply.replacingOccurrences(of: #""id":1"#, with: "\"id\":\(id)"))
+        }
+        if repliesToHistory, object["type"] as? String == "get_history" {
+            push(#"{"type":"history","id":\#(id),"session_id":"sess_test","messages":[]}"#)
         }
     }
 
@@ -108,6 +113,15 @@ private func waitForSentLines(_ transport: FakeTransport, count: Int) async thro
         try await Task.sleep(nanoseconds: 5_000_000)
     }
     return sent
+}
+
+private func expectLive(_ iterator: inout AsyncStream<ConnectionOutput>.Iterator) async {
+    #expect(await iterator.next() == .phase(.connecting))
+    #expect(await iterator.next() == .phase(.connected))
+    guard case .event(.history)? = await iterator.next() else {
+        Issue.record("expected the history reply after going live")
+        return
+    }
 }
 
 @Test func unauthorizedOnFirstSendAsksForRePair() async throws {
@@ -403,8 +417,7 @@ final class TransportQueue: @unchecked Sendable {
     let connection = makeConnection(transport: transport)
     let stream = await connection.start(workingDirectory: "/repo")
     var iterator = stream.makeAsyncIterator()
-    _ = await iterator.next()
-    _ = await iterator.next()
+    await expectLive(&iterator)
     _ = try await waitForSentLines(transport, count: 2)
 
     await transport.push(#"{"type":"error","id":7,"message":"rate limited"}"#)
@@ -447,16 +460,15 @@ final class TransportQueue: @unchecked Sendable {
     let stream = await connection.start()
 
     var iterator = stream.makeAsyncIterator()
-    #expect(await iterator.next() == .phase(.connecting))
-    #expect(await iterator.next() == .phase(.connected))
+    await expectLive(&iterator)
 
     await transport.push(#"{"type":"text_delta","text":"hi"}"#)
     #expect(await iterator.next() == .event(.textDelta(text: "hi")))
 
     // Multiple newline-delimited events in one frame.
-    await transport.push("{\"type\":\"message_end\"}\n{\"type\":\"done\",\"id\":1}")
+    await transport.push("{\"type\":\"message_end\"}\n{\"type\":\"done\",\"id\":9}")
     #expect(await iterator.next() == .event(.messageEnd))
-    #expect(await iterator.next() == .event(.done(id: 1)))
+    #expect(await iterator.next() == .event(.done(id: 9)))
 
     await connection.stop()
 }
@@ -511,8 +523,7 @@ final class TransportQueue: @unchecked Sendable {
     let stream = await connection.start()
 
     var iterator = stream.makeAsyncIterator()
-    _ = await iterator.next()  // connecting
-    _ = await iterator.next()  // connected
+    await expectLive(&iterator)
 
     await transport.push(#"{"type":"session","session_id":"sess_42"}"#)
     #expect(await iterator.next() == .event(.sessionID(sessionID: "sess_42")))
@@ -526,8 +537,7 @@ final class TransportQueue: @unchecked Sendable {
     let stream = await connection.start()
 
     var iterator = stream.makeAsyncIterator()
-    #expect(await iterator.next() == .phase(.connecting))
-    #expect(await iterator.next() == .phase(.connected))
+    await expectLive(&iterator)
 
     await transport.push(#"{"type":"session_close_requested","reason":"taken over"}"#)
     #expect(
@@ -566,8 +576,7 @@ final class TransportQueue: @unchecked Sendable {
     let stream = await connection.start()
 
     var iterator = stream.makeAsyncIterator()
-    #expect(await iterator.next() == .phase(.connecting))
-    #expect(await iterator.next() == .phase(.connected))
+    await expectLive(&iterator)
 
     await transport.push(#"{"type":"reloading"}"#)
     #expect(await iterator.next() == .event(.reloading(newSocket: nil)))
@@ -610,5 +619,43 @@ final class TransportQueue: @unchecked Sendable {
     }
     #expect(reason.contains("Re-pair"))
 
+    await connection.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) func staysConnectingUntilHistoryRequestIsAnswered() async throws {
+    let transport = FakeTransport(repliesToHistory: false)
+    let connection = makeConnection(transport: transport)
+    let stream = await connection.start(resumeSessionID: "sess_1")
+    var iterator = stream.makeAsyncIterator()
+    #expect(await iterator.next() == .phase(.connecting))
+    _ = try await waitForSentLines(transport, count: 2)
+
+    await transport.push(#"{"type":"history","id":1,"session_id":"sess_1","messages":[]}"#)
+    guard case .event(.history(let resumeReply))? = await iterator.next() else {
+        Issue.record("expected the resume history to be forwarded")
+        return
+    }
+    #expect(resumeReply.id == 1)
+
+    await transport.push(#"{"type":"history","id":2,"session_id":"sess_1","messages":[]}"#)
+    #expect(await iterator.next() == .phase(.connected))
+    guard case .event(.history(let syncReply))? = await iterator.next() else {
+        Issue.record("expected the synced history after going live")
+        return
+    }
+    #expect(syncReply.id == 2)
+    await connection.stop()
+}
+
+@Test func subscribeAcknowledgementIsNotForwarded() async throws {
+    let transport = FakeTransport()
+    let connection = makeConnection(transport: transport)
+    let stream = await connection.start(resumeSessionID: "sess_1")
+    var iterator = stream.makeAsyncIterator()
+    await expectLive(&iterator)
+
+    await transport.push(#"{"type":"done","id":1}"#)
+    await transport.push(#"{"type":"done","id":7}"#)
+    #expect(await iterator.next() == .event(.done(id: 7)))
     await connection.stop()
 }
