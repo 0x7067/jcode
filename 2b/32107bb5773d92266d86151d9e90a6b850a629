@@ -1,0 +1,25 @@
+ios/Sources/JCodeKit/SessionReducer.swift
+  s_b1134115a829bc::t_7902026679d3ec 440,445-446,449-452,501-540
+ios/Sources/JCodeKit/Wire.swift
+  s_b1134115a829bc::t_e4ff65425bbf78 335,393-407
+ios/Tests/JCodeKitTests/SessionReducerTests.swift
+  s_b1134115a829bc::t_3c510e39062232 271,273,283,289-328
+ios/Tests/JCodeKitTests/WireTests.swift
+  s_b1134115a829bc::t_71503def31105d 197-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2b32107bb5773d92266d86151d9e90a6b850a629",
+  "prompts": {},
+  "sessions": {
+    "s_b1134115a829bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "405a5bce-9dd3-4994-8874-c471a7e27dfc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
