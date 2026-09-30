@@ -437,15 +437,19 @@ public enum SessionReducer {
         for message in payload.messages {
             if message.role == "tool" {
                 guard let data = message.toolData else { continue }
+                let output = data.output ?? message.content
                 let call = TranscriptEntry.ToolCall(
                     id: data.id,
                     name: data.name,
                     input: data.input,
-                    output: data.output ?? message.content,
-                    status: data.error.map { .failed($0) } ?? .succeeded
+                    output: output,
+                    status: data.error.map { .failed($0) } ?? historyToolStatus(output: output)
                 )
                 if let last = entries.indices.last, entries[last].role == .assistant {
-                    if let index = entries[last].toolCalls.firstIndex(where: { $0.id == call.id }) {
+                    let calls = entries[last].toolCalls
+                    if let index = calls.firstIndex(where: { $0.id == call.id })
+                        ?? calls.firstIndex(where: { $0.id == $0.name && $0.name == call.name })
+                    {
                         entries[last].toolCalls[index] = call
                     } else {
                         entries[last].toolCalls.append(call)
@@ -492,6 +496,46 @@ public enum SessionReducer {
             return nil
         }
         return TranscriptEntry(role: role, text: message.content, toolCalls: toolCalls)
+    }
+
+    private static func historyToolStatus(output: String) -> TranscriptEntry.ToolCall.Status {
+        guard toolOutputLooksFailed(output) else { return .succeeded }
+        let reason = output.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+        return .failed(reason ?? "Failed")
+    }
+
+    private static func toolOutputLooksFailed(_ output: String) -> Bool {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        var normalized = Substring(trimmed)
+        if normalized.hasPrefix("["), let close = normalized.range(of: "] ") {
+            let label = normalized[normalized.index(after: normalized.startIndex)..<close.lowerBound]
+            if !label.isEmpty && !label.contains(where: \.isNewline) {
+                normalized = normalized[close.upperBound...]
+            }
+        }
+        let lower = normalized.lowercased()
+        if lower.hasPrefix("error:") || lower.hasPrefix("failed:") || normalized.hasPrefix("\u{2717}") {
+            return true
+        }
+        return normalized.split(whereSeparator: \.isNewline).contains { rawLine in
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            let lowerLine = line.lowercased()
+            return nonzeroExitCode(line, prefix: "Exit code:")
+                || nonzeroExitCode(line, prefix: "--- Command finished with exit code:")
+                || ["status: failed", "failed to start", "terminated"].contains(lowerLine)
+        }
+    }
+
+    private static func nonzeroExitCode(_ line: String, prefix: String) -> Bool {
+        guard line.hasPrefix(prefix) else { return false }
+        let code = line.dropFirst(prefix.count)
+            .trimmingCharacters(in: .whitespaces)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+            .trimmingCharacters(in: .whitespaces)
+        return Int32(code).map { $0 != 0 } ?? false
     }
 
     // MARK: - Helpers
