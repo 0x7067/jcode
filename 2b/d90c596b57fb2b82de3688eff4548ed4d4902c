@@ -1,0 +1,21 @@
+ios/Sources/JCodeMobile/AppModel.swift
+  s_b1134115a829bc::t_e464428b00068f 79-84
+ios/Sources/JCodeMobile/Views/WorkspacePickerView.swift
+  s_b1134115a829bc::t_59fc4a8188a8a7 66-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2bd90c596b57fb2b82de3688eff4548ed4d4902c",
+  "prompts": {},
+  "sessions": {
+    "s_b1134115a829bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "405a5bce-9dd3-4994-8874-c471a7e27dfc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
