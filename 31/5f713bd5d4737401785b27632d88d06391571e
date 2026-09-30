@@ -1,0 +1,21 @@
+ios/Sources/JCodeKit/Pairing.swift
+  s_b1134115a829bc::t_a2fea7c27e4cd6 81-88,91
+ios/Tests/JCodeKitTests/WireTests.swift
+  s_b1134115a829bc::t_29d469ee86afbc 14-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "315f713bd5d4737401785b27632d88d06391571e",
+  "prompts": {},
+  "sessions": {
+    "s_b1134115a829bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "405a5bce-9dd3-4994-8874-c471a7e27dfc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
