@@ -63,9 +63,14 @@ struct WorkspacePickerView: View {
                     }
                 } else if let server = model.activeServer {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Change server") { model.removeServer(server) }
-                            .accessibilityHint("Forgets this server so you can pair a different one")
-                            .accessibilityIdentifier("workspace-change-server")
+                        Menu("Change server") {
+                            ForEach(model.servers.filter { $0.id != server.id }) { other in
+                                Button(other.serverName) { model.connect(to: other) }
+                            }
+                            Button("Pair new server", systemImage: "plus") { model.leaveServer() }
+                        }
+                        .accessibilityHint("Switches to another saved server or pairs a new one")
+                        .accessibilityIdentifier("workspace-change-server")
                     }
                 }
             }

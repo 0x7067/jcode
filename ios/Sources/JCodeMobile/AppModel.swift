@@ -76,6 +76,12 @@ final class AppModel {
         }
     }
 
+    func leaveServer() {
+        unconfirmedWorkspaceFallback = nil
+        disconnect()
+        activeServer = nil
+    }
+
     // MARK: - Connection lifecycle
 
     func connect(to credential: ServerCredential, sessionID: String? = nil) {
