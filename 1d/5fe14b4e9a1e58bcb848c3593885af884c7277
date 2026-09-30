@@ -1,0 +1,21 @@
+ios/Sources/JCodeKit/Connection.swift
+  s_b1134115a829bc::t_9c6033a508a6f9 65,224,253-255,258-261
+ios/Tests/JCodeKitTests/ConnectionTests.swift
+  s_b1134115a829bc::t_f194a703a04132 19,26,29,50,52-53,56-58,118-126,420,463,469,471,526,540,579,624-661
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1d5fe14b4e9a1e58bcb848c3593885af884c7277",
+  "prompts": {},
+  "sessions": {
+    "s_b1134115a829bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "405a5bce-9dd3-4994-8874-c471a7e27dfc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
