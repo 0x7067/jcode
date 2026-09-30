@@ -1,0 +1,19 @@
+ios/Sources/JCodeMobile/Views/ChatView.swift
+  s_b1134115a829bc::t_20d67bbd2296c3 68-70,73-74,86,88-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "042b6945fb73f9fcce21e45051dc3dc863205429",
+  "prompts": {},
+  "sessions": {
+    "s_b1134115a829bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "405a5bce-9dd3-4994-8874-c471a7e27dfc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pedro Guimarães <21346846+0x7067@users.noreply.github.com>"
+    }
+  }
+}
