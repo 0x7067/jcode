@@ -11,7 +11,22 @@ import Testing
         for: URLError(.appTransportSecurityRequiresSecureConnection), gateway: gateway)
     #expect(message.hasPrefix("Could not reach 100.64.0.8:7643: "))
     #expect(message.contains("plain HTTP"))
-    #expect(message.contains("HTTPS"))
+    #expect(!message.contains("HTTPS"))
+}
+
+@Test func pairingFailureShowsTheServerRejection() {
+    let gateway = Gateway(host: "devbox.tailnet.ts.net")
+    let message = PairingFailure.message(
+        for: PairingClient.PairingError.invalidCode("Invalid or expired pairing code"), gateway: gateway)
+    #expect(message == "Invalid or expired pairing code")
+}
+
+@Test func pairingFailureShowsServerErrors() {
+    let gateway = Gateway(host: "devbox.tailnet.ts.net")
+    let message = PairingFailure.message(
+        for: PairingClient.PairingError.serverError(statusCode: 500, message: "registry unavailable"),
+        gateway: gateway)
+    #expect(message == "registry unavailable")
 }
 
 @Test func pairingFailureIncludesTheUnderlyingError() {
